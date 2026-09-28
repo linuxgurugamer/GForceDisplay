@@ -1,69 +1,107 @@
 # GForceDisplay for KSP1
 
-Displays the active vessel's current G-force in flight as a numerical value and an analog dial.
+GForceDisplay is a flight instrument for Kerbal Space Program 1 that shows the G-forces acting on the active vessel in a compact, resizable window.
 
-## Features
+It provides an analog G-force dial together with separate vertical and horizontal G indicators, allowing you to see both the overall load on the vessel and how that acceleration is oriented.
 
-- Large numerical G readout.
-- Analog dial with configurable maximum range.
-- Configurable warning and redline thresholds; dial ticks, needle, and value change color at the thresholds.
-- Two display modes:
-  - **Total G** uses KSP's `FlightGlobals.ActiveVessel.geeForce` and is always non-negative.
-  - **Signed axial G** estimates the felt acceleration along the vessel reference transform's `up` axis, allowing positive and negative G values.
-- Peak G tracking with a Reset Peak button. Signed mode tracks positive and negative peaks separately.
-- Peak values reset automatically when the active vessel changes.
-- Movable main and settings windows with saved positions.
-- ClickThroughBlocker support so clicks on the windows do not pass through into the flight scene.
-- ToolbarController support for stock Application Launcher and Blizzy Toolbar selection.
+## What the mod displays
+
+### Main G-force dial
+
+The main display shows the vessel's current G-force both numerically and on an analog dial.
+
+It supports two modes:
+
+- **Total G** — uses KSP's `FlightGlobals.ActiveVessel.geeForce` and displays the overall G-load as a non-negative value.
+- **Signed axial G** — shows acceleration along the vessel reference transform's `up` axis, allowing both positive and negative G readings.
+
+The dial includes:
+
+- Configurable maximum G range.
+- Configurable warning threshold.
+- Configurable redline threshold.
+- Color changes as the warning and redline limits are reached.
+- Current G-force numerical readout.
+- Minimum and maximum observed G markers.
+- Peak/reset controls.
+
+### Vertical G indicator
+
+A vertical sliding scale is displayed to the left of the main dial.
+
+- Shows signed vertical G relative to the current celestial body.
+- Positive values represent acceleration away from the body's center.
+- Negative values represent acceleration downward.
+- Includes scale markings and a labeled zero point.
+- Tracks and displays its own minimum and maximum observed values.
+- MIN and MAX markers are shown as short markers to the left of the scale.
+
+The vertical indicator can be independently enabled or disabled in Settings.
+
+### Horizontal G indicator
+
+A horizontal sliding scale is displayed below the main dial.
+
+- Shows the magnitude of acceleration in the local horizontal plane.
+- Uses the configured maximum G value for its scale.
+- Includes scale markings.
+- Tracks and displays its own minimum and maximum observed values.
+- MIN and MAX markers are shown as short markers below the scale.
+
+The horizontal indicator can be independently enabled or disabled in Settings.
+
+## Minimum and maximum tracking
+
+GForceDisplay tracks extrema independently for:
+
+- Main G-force dial.
+- Vertical G.
+- Horizontal G.
+
+The **Reset Peak** control resets all tracked minimum and maximum values.
+
+Extrema are also reset automatically when the active vessel changes.
+
+## Window behavior
+
+- Main window is movable by dragging from almost anywhere on the window.
+- Window is resizable using the resize grip.
+- The dial and component indicators resize with the window.
+- The main dial automatically expands into unused space when the vertical or horizontal indicator is disabled.
+- Window position and size are remembered.
+- The main window and Settings window start closed and are opened from the toolbar.
+- Optional automatic hiding while the game is paused is enabled by default.
+- Pressing **F2** or otherwise hiding the KSP UI always hides GForceDisplay temporarily.
+- When the KSP UI is restored, the display returns if it was previously open.
+
+## Toolbar and click-through support
+
+GForceDisplay supports:
+
+- **ToolbarController** for integration with the stock Application Launcher and Blizzy Toolbar.
+- **ClickThroughBlocker** so mouse clicks on the GForceDisplay windows do not pass through to the flight scene.
 
 ## Dependencies
 
-These are required at runtime and when building:
+The mod requires:
 
 - ClickThroughBlocker
 - ToolbarController
 
-The DLLs are **not** bundled in this source archive. The project expects the standard install paths:
+These dependencies are not bundled with the source package.
 
-- `GameData/000_ClickThroughBlocker/Plugins/ClickThroughBlocker.dll`
-- `GameData/001_ToolbarControl/Plugins/ToolbarControl.dll`
+## Signed G calculation
 
-## Building
+KSP exposes `Vessel.geeForce` as a scalar magnitude and therefore does not provide a negative direction.
 
-Set the `KSP_ROOT` environment variable to your KSP installation directory, for example:
+For signed axial G, GForceDisplay calculates proper acceleration from the vessel's change in orbital velocity, removes gravitational acceleration, and projects the resulting acceleration onto `vessel.ReferenceTransform.up`.
 
-```bat
-set KSP_ROOT=C:\Games\Kerbal Space Program
-```
+This provides a directional positive/negative axial G reading while Total G continues to use KSP's stock scalar G-force value.
 
-Then build the project in `Source/GForceDisplay` with Visual Studio or:
+## Current version
 
-```bat
-dotnet build -c Release
-```
+### 0.2.8
 
-The DLL is written directly to:
-
-`GameData/GForceDisplay/Plugins/GForceDisplay.dll`
-
-Copy the `GameData/GForceDisplay` folder into your KSP installation's `GameData` directory.
-
-## Signed G note
-
-KSP exposes `Vessel.geeForce` as a scalar magnitude, so it does not contain a negative direction. Signed mode therefore calculates a directional value by differentiating the vessel's orbital velocity, subtracting `vessel.graviticAcceleration`, and projecting the resulting proper acceleration onto `vessel.ReferenceTransform.up`. This makes signed mode useful for detecting positive versus negative axial loading, while Total G remains the authoritative stock KSP scalar G-load.
-
-### G component sliders
-
-The flight display also includes two live sliding G indicators:
-
-- **Vertical G** — a signed slider to the left of the main dial. Positive values are acceleration away from the current body center; negative values are downward.
-- **Horizontal G** — a magnitude slider below the main dial showing acceleration in the local horizontal plane.
-
-Both indicators use the configured dial maximum as their scale and the configured warning/redline thresholds for marker color. They resize with the main window. Each indicator can be independently enabled or disabled in Settings; both are enabled by default, and the main dial expands to use the freed space when an indicator is hidden.
-
-
-## 0.2.7
-
-- Added independent settings to show/hide the vertical and horizontal G graphs.
-- Both component graphs are enabled by default.
-- The main dial reflows to use space freed by hidden component graphs.
+- Main and Settings windows no longer open automatically when entering flight.
+- Window visibility is controlled by the toolbar during the current session.
+- Existing window position, size, graph, threshold, and display settings remain persistent.

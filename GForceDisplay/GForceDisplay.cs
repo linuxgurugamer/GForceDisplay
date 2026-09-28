@@ -31,7 +31,7 @@ namespace GForceDisplay
 
         private Rect windowRect = new Rect(300f, 120f, 420f, 460f);
         private Rect settingsRect = new Rect(590f, 120f, 300f, 320f);
-        private bool windowVisible = true;
+        private bool windowVisible = false;
         private bool settingsVisible;
         private bool uiHidden;
         private bool hideWhenPaused = true;
@@ -973,7 +973,9 @@ namespace GForceDisplay
                 windowRect.height = config.GetValue<float>("windowHeight", windowRect.height);
                 settingsRect.x = config.GetValue<float>("settingsX", settingsRect.x);
                 settingsRect.y = config.GetValue<float>("settingsY", settingsRect.y);
-                windowVisible = config.GetValue<bool>("windowVisible", true);
+                // Windows always start closed; visibility is session-only.
+                windowVisible = false;
+                settingsVisible = false;
                 signedGMode = config.GetValue<bool>("signedGMode", false);
                 showVerticalG = config.GetValue<bool>("showVerticalG", true);
                 showHorizontalG = config.GetValue<bool>("showHorizontalG", true);
