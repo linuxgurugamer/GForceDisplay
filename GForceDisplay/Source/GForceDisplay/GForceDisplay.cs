@@ -30,9 +30,16 @@ namespace GForceDisplay
         private const float ResizeGripSize = 18f;
 
         private Rect windowRect = new Rect(300f, 120f, 420f, 460f);
-        private Rect settingsRect = new Rect(590f, 120f, 300f, 270f);
-        private bool windowVisible = true;
+        private Rect settingsRect = new Rect(590f, 120f, 300f, 370f);
+        private bool windowVisible = false;
         private bool settingsVisible;
+        private bool uiHidden;
+        private bool hideWhenPaused = true;
+        private bool showDial = true;
+        private bool totalGAsVerticalGraph;
+        private bool showVerticalG = true;
+        private bool showHorizontalG = true;
+        private Color barFillColor = new Color(0.20f, 0.70f, 1.00f, 0.60f);
         private bool resizingMainWindow;
         private Vector2 resizeStartMouse;
         private Vector2 resizeStartSize;
@@ -77,12 +84,18 @@ namespace GForceDisplay
         private string dialMaxText;
         private string warningGText;
         private string redlineGText;
+        private string barFillRText;
+        private string barFillGText;
+        private string barFillBText;
 
         private void Awake()
         {
             CreateTextures();
             LoadSettings();
             ResetSettingText();
+
+            GameEvents.onHideUI.Add(OnHideUI);
+            GameEvents.onShowUI.Add(OnShowUI);
         }
 
         private void Start()
@@ -92,9 +105,32 @@ namespace GForceDisplay
 
         private void OnDestroy()
         {
+            GameEvents.onHideUI.Remove(OnHideUI);
+            GameEvents.onShowUI.Remove(OnShowUI);
+
             SaveSettings();
             if (whiteTexture != null)
                 Destroy(whiteTexture);
+        }
+
+        private void OnHideUI()
+        {
+            // F2 / stock Hide UI must always suppress every G-Force Display window.
+            // Do not change windowVisible/settingsVisible here so they can return when the UI is shown.
+            uiHidden = true;
+        }
+
+        private void OnShowUI()
+        {
+            uiHidden = false;
+        }
+
+        private bool ShouldSuppressWindows()
+        {
+            if (uiHidden)
+                return true;
+
+            return hideWhenPaused && Time.timeScale <= 0.0001f;
         }
 
         private void FixedUpdate()
@@ -239,6 +275,9 @@ namespace GForceDisplay
             GUI.skin = HighLogic.Skin;
             EnsureStyles();
 
+            if (ShouldSuppressWindows())
+                return;
+
             if (windowVisible)
             {
                 NormalizeMainWindowRect();
@@ -283,20 +322,65 @@ namespace GForceDisplay
             float buttonY = height - margin - buttonHeight;
             float peakY = buttonY - gap - peakHeight;
             float rangeY = peakY - rangeHeight;
-            float horizontalGraphY = rangeY - gap - horizontalGraphHeight;
-            float contentBottom = horizontalGraphY - gap;
-            float contentHeight = Mathf.Max(120f, contentBottom - y);
 
-            Rect verticalRect = new Rect(margin, y, verticalGraphWidth, contentHeight);
-            DrawVerticalGSlider(verticalRect, smoothedVerticalG);
+            // When the main dial is hidden, show enabled auxiliary graphs as vertical
+            // sliders. If both are enabled, they share the available width side by side.
+            if (!showDial)
+            {
+                float contentBottom = rangeY - gap;
+                float contentHeight = Mathf.Max(120f, contentBottom - y);
+                int graphCount = (showVerticalG ? 1 : 0) + (showHorizontalG ? 1 : 0);
 
-            float dialX = margin + verticalGraphWidth + gap;
-            float dialWidth = Mathf.Max(140f, width - dialX - margin);
-            Rect dialRect = new Rect(dialX, y, dialWidth, contentHeight);
-            DrawDial(dialRect, smoothedG);
+                if (graphCount > 0)
+                {
+                    float totalGap = graphCount > 1 ? gap : 0f;
+                    float graphWidth = Mathf.Max(100f, (width - margin * 2f - totalGap) / graphCount);
+                    float graphX = margin;
 
-            Rect horizontalRect = new Rect(dialX, horizontalGraphY, dialWidth, horizontalGraphHeight);
-            DrawHorizontalGSlider(horizontalRect, smoothedHorizontalG);
+                    if (showVerticalG)
+                    {
+                        DrawVerticalGSlider(new Rect(graphX, y, graphWidth, contentHeight), smoothedVerticalG);
+                        graphX += graphWidth + gap;
+                    }
+
+                    if (showHorizontalG)
+                    {
+                        DrawHorizontalGVerticalSlider(new Rect(graphX, y, graphWidth, contentHeight), smoothedHorizontalG);
+                    }
+                }
+                else
+                {
+                    GUI.Label(new Rect(margin, y + 20f, width - margin * 2f, 30f),
+                        "All G displays are disabled", centeredStyle);
+                }
+            }
+            else
+            {
+                float horizontalGraphY = showHorizontalG ? rangeY - gap - horizontalGraphHeight : rangeY;
+                float contentBottom = showHorizontalG ? horizontalGraphY - gap : rangeY - gap;
+                float contentHeight = Mathf.Max(120f, contentBottom - y);
+
+                float dialX = margin;
+                if (showVerticalG)
+                {
+                    Rect verticalRect = new Rect(margin, y, verticalGraphWidth, contentHeight);
+                    DrawVerticalGSlider(verticalRect, smoothedVerticalG);
+                    dialX += verticalGraphWidth + gap;
+                }
+
+                float dialWidth = Mathf.Max(140f, width - dialX - margin);
+                Rect dialRect = new Rect(dialX, y, dialWidth, contentHeight);
+                if (totalGAsVerticalGraph)
+                    DrawTotalGVerticalSlider(dialRect, smoothedG);
+                else
+                    DrawDial(dialRect, smoothedG);
+
+                if (showHorizontalG)
+                {
+                    Rect horizontalRect = new Rect(dialX, horizontalGraphY, dialWidth, horizontalGraphHeight);
+                    DrawHorizontalGSlider(horizontalRect, smoothedHorizontalG);
+                }
+            }
 
             GUI.Label(new Rect(margin, rangeY, width - margin * 2f, rangeHeight),
                 signedGMode
@@ -377,12 +461,25 @@ namespace GForceDisplay
                 {
                     string format = dialMax <= 5f ? "0.0" : "0";
                     string label = i == 5 ? "0" : scaleValue.ToString(format);
-                    GUI.Label(new Rect(rect.x, tickY - 9f, Mathf.Max(28f, track.x - rect.x - 10f), 18f),
+                    GUI.Label(new Rect(track.x - 48f, tickY - 9f, 36f, 18f),
                         label, dialLabelStyle);
                 }
             }
 
             float zeroY = track.y + track.height * 0.5f;
+
+            // Fill from 0 G to the current signed vertical-G value.
+            float fillClamped = Mathf.Clamp(value, -dialMax, dialMax);
+            float fillNormalized = Mathf.InverseLerp(-dialMax, dialMax, fillClamped);
+            float fillY = Mathf.Lerp(track.yMax, track.y, fillNormalized);
+            float fillTop = Mathf.Min(zeroY, fillY);
+            float fillHeight = Mathf.Abs(fillY - zeroY);
+            if (fillHeight > 0.5f)
+            {
+                GUI.color = barFillColor;
+                GUI.DrawTexture(new Rect(track.x, fillTop, track.width, fillHeight), whiteTexture);
+            }
+
             GUI.color = new Color(1f, 1f, 1f, 0.80f);
             GUI.DrawTexture(new Rect(track.x - 9f, zeroY - 1f, track.width + 18f, 2f), whiteTexture);
 
@@ -415,6 +512,192 @@ namespace GForceDisplay
                 string.Format("{0:+0.00;-0.00;0.00} G", value), centeredStyle);
         }
 
+        private void DrawTotalGVerticalSlider(Rect rect, float value)
+        {
+            GUI.Label(new Rect(rect.x, rect.y, rect.width, 18f), "Total G", centeredStyle);
+
+            Color maxColor = new Color(0.25f, 1f, 0.35f, 1f);
+            Color minColor = new Color(0.25f, 0.75f, 1f, 1f);
+            Color oldTextColor = dialLabelStyle.normal.textColor;
+
+            if (haveObservedExtrema)
+            {
+                dialLabelStyle.normal.textColor = maxColor;
+                GUI.Label(new Rect(rect.x, rect.y + 17f, rect.width, 18f),
+                    "MAX " + observedMaxG.ToString("+0.00;-0.00;0.00"), dialLabelStyle);
+                dialLabelStyle.normal.textColor = minColor;
+                GUI.Label(new Rect(rect.x, rect.yMax - 38f, rect.width, 18f),
+                    "MIN " + observedMinG.ToString("+0.00;-0.00;0.00"), dialLabelStyle);
+                dialLabelStyle.normal.textColor = oldTextColor;
+            }
+
+            float trackTop = rect.y + 38f;
+            float trackBottom = rect.yMax - 42f;
+            float trackHeight = Mathf.Max(40f, trackBottom - trackTop);
+            float trackWidth = Mathf.Min(22f, rect.width * 0.28f);
+            float trackX = rect.x + rect.width * 0.62f - trackWidth * 0.5f;
+            Rect track = new Rect(trackX, trackTop, trackWidth, trackHeight);
+
+            float minScale = signedGMode ? -dialMax : 0f;
+            float maxScale = dialMax;
+
+            Color old = GUI.color;
+            GUI.color = new Color(0.08f, 0.08f, 0.08f, 0.90f);
+            GUI.DrawTexture(track, whiteTexture);
+
+            float zeroT = Mathf.InverseLerp(minScale, maxScale, 0f);
+            float zeroY = Mathf.Lerp(track.yMax, track.y, zeroT);
+
+            float fillClamped = Mathf.Clamp(value, minScale, maxScale);
+            float fillNormalized = Mathf.InverseLerp(minScale, maxScale, fillClamped);
+            float fillY = Mathf.Lerp(track.yMax, track.y, fillNormalized);
+            float fillTop = Mathf.Min(zeroY, fillY);
+            float fillHeight = Mathf.Abs(fillY - zeroY);
+            if (fillHeight > 0.5f)
+            {
+                GUI.color = barFillColor;
+                GUI.DrawTexture(new Rect(track.x, fillTop, track.width, fillHeight), whiteTexture);
+            }
+
+            for (int i = 0; i <= 10; i++)
+            {
+                float t = i / 10f;
+                float scaleValue = Mathf.Lerp(minScale, maxScale, t);
+                float tickY = Mathf.Lerp(track.yMax, track.y, t);
+                bool zeroTick = Mathf.Abs(scaleValue) < (dialMax / 20f + 0.0001f);
+                bool major = (i % 2 == 0) || zeroTick;
+                float tickLength = major ? 8f : 4f;
+
+                GUI.color = new Color(1f, 1f, 1f, major ? 0.70f : 0.35f);
+                GUI.DrawTexture(new Rect(track.x - tickLength - 2f, tickY - 1f,
+                    tickLength, major ? 2f : 1f), whiteTexture);
+
+                if (major)
+                {
+                    string format = dialMax <= 5f ? "0.0" : "0";
+                    string label = zeroTick ? "0" : scaleValue.ToString(format);
+                    GUI.Label(new Rect(track.x - 48f, tickY - 9f, 36f, 18f),
+                        label, dialLabelStyle);
+                }
+            }
+
+            GUI.color = new Color(1f, 1f, 1f, 0.80f);
+            GUI.DrawTexture(new Rect(track.x - 9f, zeroY - 1f, track.width + 18f, 2f), whiteTexture);
+
+            if (haveObservedExtrema)
+            {
+                float minT = Mathf.InverseLerp(minScale, maxScale,
+                    Mathf.Clamp(observedMinG, minScale, maxScale));
+                float maxT = Mathf.InverseLerp(minScale, maxScale,
+                    Mathf.Clamp(observedMaxG, minScale, maxScale));
+                float minY = Mathf.Lerp(track.yMax, track.y, minT);
+                float maxY = Mathf.Lerp(track.yMax, track.y, maxT);
+
+                const float extremaMarkerLength = 12f;
+                GUI.color = minColor;
+                GUI.DrawTexture(new Rect(track.x - extremaMarkerLength - 3f, minY - 2f,
+                    extremaMarkerLength, 4f), whiteTexture);
+                GUI.color = maxColor;
+                GUI.DrawTexture(new Rect(track.x - extremaMarkerLength - 3f, maxY - 2f,
+                    extremaMarkerLength, 4f), whiteTexture);
+            }
+
+            float clamped = Mathf.Clamp(value, minScale, maxScale);
+            float normalized = Mathf.InverseLerp(minScale, maxScale, clamped);
+            float markerY = Mathf.Lerp(track.yMax, track.y, normalized);
+            GUI.color = GetThresholdColor(value);
+            GUI.DrawTexture(new Rect(track.x - 9f, markerY - 3f, track.width + 18f, 6f), whiteTexture);
+            GUI.color = old;
+
+            GUI.Label(new Rect(rect.x, rect.yMax - 20f, rect.width, 20f),
+                string.Format("{0:+0.00;-0.00;0.00} G", value), centeredStyle);
+        }
+
+        private void DrawHorizontalGVerticalSlider(Rect rect, float value)
+        {
+            GUI.Label(new Rect(rect.x, rect.y, rect.width, 18f), "Horizontal", centeredStyle);
+
+            Color maxColor = new Color(0.25f, 1f, 0.35f, 1f);
+            Color minColor = new Color(0.25f, 0.75f, 1f, 1f);
+            Color oldTextColor = dialLabelStyle.normal.textColor;
+
+            if (haveObservedHorizontalExtrema)
+            {
+                dialLabelStyle.normal.textColor = maxColor;
+                GUI.Label(new Rect(rect.x, rect.y + 17f, rect.width, 18f),
+                    "MAX " + observedMaxHorizontalG.ToString("0.00"), dialLabelStyle);
+                dialLabelStyle.normal.textColor = minColor;
+                GUI.Label(new Rect(rect.x, rect.yMax - 38f, rect.width, 18f),
+                    "MIN " + observedMinHorizontalG.ToString("0.00"), dialLabelStyle);
+                dialLabelStyle.normal.textColor = oldTextColor;
+            }
+
+            float trackTop = rect.y + 38f;
+            float trackBottom = rect.yMax - 42f;
+            float trackHeight = Mathf.Max(40f, trackBottom - trackTop);
+            float trackWidth = Mathf.Min(22f, rect.width * 0.28f);
+            float trackX = rect.x + rect.width * 0.62f - trackWidth * 0.5f;
+            Rect track = new Rect(trackX, trackTop, trackWidth, trackHeight);
+
+            Color old = GUI.color;
+            GUI.color = new Color(0.08f, 0.08f, 0.08f, 0.90f);
+            GUI.DrawTexture(track, whiteTexture);
+
+            // Horizontal G is an unsigned magnitude; fill vertically from 0 G at the bottom.
+            float fillClamped = Mathf.Clamp(value, 0f, dialMax);
+            float fillNormalized = Mathf.InverseLerp(0f, dialMax, fillClamped);
+            float fillY = Mathf.Lerp(track.yMax, track.y, fillNormalized);
+            if (track.yMax - fillY > 0.5f)
+            {
+                GUI.color = barFillColor;
+                GUI.DrawTexture(new Rect(track.x, fillY, track.width, track.yMax - fillY), whiteTexture);
+            }
+
+            for (int i = 0; i <= 10; i++)
+            {
+                float t = i / 10f;
+                float scaleValue = Mathf.Lerp(0f, dialMax, t);
+                float tickY = Mathf.Lerp(track.yMax, track.y, t);
+                bool major = (i % 2 == 0);
+                float tickLength = major ? 8f : 4f;
+
+                GUI.color = new Color(1f, 1f, 1f, major ? 0.70f : 0.35f);
+                GUI.DrawTexture(new Rect(track.x - tickLength - 2f, tickY - 1f,
+                    tickLength, major ? 2f : 1f), whiteTexture);
+
+                if (major)
+                {
+                    string format = dialMax <= 5f ? "0.0" : "0";
+                    GUI.Label(new Rect(track.x - 48f, tickY - 9f, 36f, 18f),
+                        scaleValue.ToString(format), dialLabelStyle);
+                }
+            }
+
+            if (haveObservedHorizontalExtrema)
+            {
+                float minT = Mathf.InverseLerp(0f, dialMax, Mathf.Clamp(observedMinHorizontalG, 0f, dialMax));
+                float maxT = Mathf.InverseLerp(0f, dialMax, Mathf.Clamp(observedMaxHorizontalG, 0f, dialMax));
+                float minY = Mathf.Lerp(track.yMax, track.y, minT);
+                float maxY = Mathf.Lerp(track.yMax, track.y, maxT);
+
+                const float extremaMarkerLength = 12f;
+                GUI.color = minColor;
+                GUI.DrawTexture(new Rect(track.x - extremaMarkerLength - 3f, minY - 2f, extremaMarkerLength, 4f), whiteTexture);
+                GUI.color = maxColor;
+                GUI.DrawTexture(new Rect(track.x - extremaMarkerLength - 3f, maxY - 2f, extremaMarkerLength, 4f), whiteTexture);
+            }
+
+            float clamped = Mathf.Clamp(value, 0f, dialMax);
+            float normalized = Mathf.InverseLerp(0f, dialMax, clamped);
+            float markerY = Mathf.Lerp(track.yMax, track.y, normalized);
+            GUI.color = GetThresholdColor(value);
+            GUI.DrawTexture(new Rect(track.x - 9f, markerY - 3f, track.width + 18f, 6f), whiteTexture);
+            GUI.color = old;
+
+            GUI.Label(new Rect(rect.x, rect.yMax - 20f, rect.width, 20f),
+                string.Format("{0:0.00} G", value), centeredStyle);
+        }
+
         private void DrawHorizontalGSlider(Rect rect, float value)
         {
             GUI.Label(new Rect(rect.x, rect.y, rect.width, 18f),
@@ -429,6 +712,16 @@ namespace GForceDisplay
             Color old = GUI.color;
             GUI.color = new Color(0.08f, 0.08f, 0.08f, 0.90f);
             GUI.DrawTexture(track, whiteTexture);
+
+            // Fill from 0 G at the left edge to the current horizontal-G magnitude.
+            float fillClamped = Mathf.Clamp(value, 0f, dialMax);
+            float fillNormalized = Mathf.InverseLerp(0f, dialMax, fillClamped);
+            float fillX = Mathf.Lerp(track.x, track.xMax, fillNormalized);
+            if (fillX - track.x > 0.5f)
+            {
+                GUI.color = barFillColor;
+                GUI.DrawTexture(new Rect(track.x, track.y, fillX - track.x, track.height), whiteTexture);
+            }
 
             // Scale markings: ten intervals, with numeric labels every second tick.
             for (int i = 0; i <= 10; i++)
@@ -570,34 +863,93 @@ namespace GForceDisplay
             }
 
             GUILayout.Space(6f);
+
+            bool newShowDial = GUILayout.Toggle(showDial, "Show total G display");
+            if (newShowDial != showDial)
+            {
+                showDial = newShowDial;
+                SaveSettings();
+            }
+
+            GUI.enabled = showDial;
+            bool newTotalGAsVerticalGraph = GUILayout.Toggle(totalGAsVerticalGraph,
+                "Show total G as vertical graph");
+            GUI.enabled = true;
+            if (newTotalGAsVerticalGraph != totalGAsVerticalGraph)
+            {
+                totalGAsVerticalGraph = newTotalGAsVerticalGraph;
+                SaveSettings();
+            }
+
+            bool newShowVerticalG = GUILayout.Toggle(showVerticalG, "Show vertical G graph");
+            if (newShowVerticalG != showVerticalG)
+            {
+                showVerticalG = newShowVerticalG;
+                SaveSettings();
+            }
+
+            bool newShowHorizontalG = GUILayout.Toggle(showHorizontalG, "Show horizontal G graph");
+            if (newShowHorizontalG != showHorizontalG)
+            {
+                showHorizontalG = newShowHorizontalG;
+                SaveSettings();
+            }
+
+            GUILayout.Space(6f);
+
+            bool newHideWhenPaused = GUILayout.Toggle(hideWhenPaused, "Hide window when game is paused");
+            if (newHideWhenPaused != hideWhenPaused)
+            {
+                hideWhenPaused = newHideWhenPaused;
+                SaveSettings();
+            }
+            GUILayout.Label("F2 / Hide UI always hides the G-Force Display windows.", HighLogic.Skin.label);
+
+            GUILayout.Space(6f);
             DrawFloatSetting("Dial maximum G", ref dialMaxText);
             DrawFloatSetting("Warning starts at G", ref warningGText);
             DrawFloatSetting("Redline starts at G", ref redlineGText);
 
             GUILayout.Space(4f);
+            GUILayout.Label("Bar fill color (RGB 0-255)", HighLogic.Skin.label);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("R", GUILayout.Width(16f));
+            barFillRText = GUILayout.TextField(barFillRText, GUILayout.Width(48f));
+            GUILayout.Label("G", GUILayout.Width(16f));
+            barFillGText = GUILayout.TextField(barFillGText, GUILayout.Width(48f));
+            GUILayout.Label("B", GUILayout.Width(16f));
+            barFillBText = GUILayout.TextField(barFillBText, GUILayout.Width(48f));
+            GUILayout.EndHorizontal();
+
+            ApplySettingsFromText(false);
+
+            GUILayout.Space(4f);
             GUILayout.Label("Warning/redline thresholds use absolute G in signed mode.", HighLogic.Skin.label);
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Apply"))
-                ApplySettingsFromText();
             if (GUILayout.Button("Defaults"))
             {
                 dialMax = 10f;
                 warningG = 4f;
                 redlineG = 6f;
                 signedGMode = false;
+                showDial = true;
+                totalGAsVerticalGraph = false;
+                showVerticalG = true;
+                showHorizontalG = true;
+                hideWhenPaused = true;
+                barFillColor = new Color(0.20f, 0.70f, 1.00f, 0.60f);
                 ResetSettingText();
                 ResetPeaks();
                 ResetAccelerationSampling();
                 SaveSettings();
             }
-            GUILayout.EndHorizontal();
-
             if (GUILayout.Button("Close"))
             {
                 settingsVisible = false;
                 SaveSettings();
             }
+            GUILayout.EndHorizontal();
 
             GUI.DragWindow(new Rect(0f, 0f, settingsRect.width, settingsRect.height));
         }
@@ -610,25 +962,77 @@ namespace GForceDisplay
             GUILayout.EndHorizontal();
         }
 
-        private void ApplySettingsFromText()
+        private void ApplySettingsFromText(bool normalizeText)
         {
+            bool changed = false;
             float newDialMax;
             float newWarning;
             float newRedline;
 
-            if (!float.TryParse(dialMaxText, out newDialMax))
-                newDialMax = dialMax;
-            if (!float.TryParse(warningGText, out newWarning))
-                newWarning = warningG;
-            if (!float.TryParse(redlineGText, out newRedline))
-                newRedline = redlineG;
+            if (float.TryParse(dialMaxText, out newDialMax))
+            {
+                newDialMax = Mathf.Clamp(newDialMax, 0.5f, 100f);
+                if (!Mathf.Approximately(newDialMax, dialMax))
+                {
+                    dialMax = newDialMax;
+                    changed = true;
+                }
+            }
 
-            dialMax = Mathf.Clamp(newDialMax, 0.5f, 100f);
-            redlineG = Mathf.Clamp(newRedline, 0f, dialMax);
-            warningG = Mathf.Clamp(newWarning, 0f, redlineG);
+            if (float.TryParse(redlineGText, out newRedline))
+            {
+                newRedline = Mathf.Clamp(newRedline, 0f, dialMax);
+                if (!Mathf.Approximately(newRedline, redlineG))
+                {
+                    redlineG = newRedline;
+                    changed = true;
+                }
+            }
 
-            ResetSettingText();
-            SaveSettings();
+            if (float.TryParse(warningGText, out newWarning))
+            {
+                newWarning = Mathf.Clamp(newWarning, 0f, redlineG);
+                if (!Mathf.Approximately(newWarning, warningG))
+                {
+                    warningG = newWarning;
+                    changed = true;
+                }
+            }
+
+            // Keep dependent thresholds valid immediately when the dial maximum changes.
+            float clampedRedline = Mathf.Clamp(redlineG, 0f, dialMax);
+            float clampedWarning = Mathf.Clamp(warningG, 0f, clampedRedline);
+            if (!Mathf.Approximately(clampedRedline, redlineG))
+            {
+                redlineG = clampedRedline;
+                changed = true;
+            }
+            if (!Mathf.Approximately(clampedWarning, warningG))
+            {
+                warningG = clampedWarning;
+                changed = true;
+            }
+
+            int r, g, b;
+            int currentR = Mathf.RoundToInt(barFillColor.r * 255f);
+            int currentG = Mathf.RoundToInt(barFillColor.g * 255f);
+            int currentB = Mathf.RoundToInt(barFillColor.b * 255f);
+
+            r = int.TryParse(barFillRText, out r) ? Mathf.Clamp(r, 0, 255) : currentR;
+            g = int.TryParse(barFillGText, out g) ? Mathf.Clamp(g, 0, 255) : currentG;
+            b = int.TryParse(barFillBText, out b) ? Mathf.Clamp(b, 0, 255) : currentB;
+
+            if (r != currentR || g != currentG || b != currentB)
+            {
+                barFillColor = new Color(r / 255f, g / 255f, b / 255f, 0.60f);
+                changed = true;
+            }
+
+            if (normalizeText)
+                ResetSettingText();
+
+            if (changed)
+                SaveSettings();
         }
 
         private void ResetSettingText()
@@ -636,6 +1040,9 @@ namespace GForceDisplay
             dialMaxText = dialMax.ToString("0.##");
             warningGText = warningG.ToString("0.##");
             redlineGText = redlineG.ToString("0.##");
+            barFillRText = Mathf.RoundToInt(barFillColor.r * 255f).ToString();
+            barFillGText = Mathf.RoundToInt(barFillColor.g * 255f).ToString();
+            barFillBText = Mathf.RoundToInt(barFillColor.b * 255f).ToString();
         }
 
         private void DrawDial(Rect rect, float g)
@@ -904,11 +1311,22 @@ namespace GForceDisplay
                 windowRect.height = config.GetValue<float>("windowHeight", windowRect.height);
                 settingsRect.x = config.GetValue<float>("settingsX", settingsRect.x);
                 settingsRect.y = config.GetValue<float>("settingsY", settingsRect.y);
-                windowVisible = config.GetValue<bool>("windowVisible", true);
+                // Windows always start closed; visibility is session-only.
+                windowVisible = false;
+                settingsVisible = false;
                 signedGMode = config.GetValue<bool>("signedGMode", false);
+                showDial = config.GetValue<bool>("showDial", true);
+                totalGAsVerticalGraph = config.GetValue<bool>("totalGAsVerticalGraph", false);
+                showVerticalG = config.GetValue<bool>("showVerticalG", true);
+                showHorizontalG = config.GetValue<bool>("showHorizontalG", true);
+                hideWhenPaused = config.GetValue<bool>("hideWhenPaused", true);
                 dialMax = config.GetValue<float>("dialMax", 10f);
                 warningG = config.GetValue<float>("warningG", 4f);
                 redlineG = config.GetValue<float>("redlineG", 6f);
+                float fillR = Mathf.Clamp01(config.GetValue<float>("barFillR", 0.20f));
+                float fillG = Mathf.Clamp01(config.GetValue<float>("barFillG", 0.70f));
+                float fillB = Mathf.Clamp01(config.GetValue<float>("barFillB", 1.00f));
+                barFillColor = new Color(fillR, fillG, fillB, 0.60f);
 
                 NormalizeMainWindowRect();
                 dialMax = Mathf.Clamp(dialMax, 0.5f, 100f);
@@ -937,9 +1355,17 @@ namespace GForceDisplay
                 config.SetValue("settingsY", settingsRect.y);
                 config.SetValue("windowVisible", windowVisible);
                 config.SetValue("signedGMode", signedGMode);
+                config.SetValue("showDial", showDial);
+                config.SetValue("totalGAsVerticalGraph", totalGAsVerticalGraph);
+                config.SetValue("showVerticalG", showVerticalG);
+                config.SetValue("showHorizontalG", showHorizontalG);
+                config.SetValue("hideWhenPaused", hideWhenPaused);
                 config.SetValue("dialMax", dialMax);
                 config.SetValue("warningG", warningG);
                 config.SetValue("redlineG", redlineG);
+                config.SetValue("barFillR", barFillColor.r);
+                config.SetValue("barFillG", barFillColor.g);
+                config.SetValue("barFillB", barFillColor.b);
                 config.save();
             }
             catch (Exception ex)
