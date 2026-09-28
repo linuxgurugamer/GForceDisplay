@@ -31,7 +31,7 @@
 1:GForceDisplay, GForceDisplay.version
 
 # 2:PROJNAME, PROJFILE, VERSIONFILE, PLUGINSFOLDER
-2:GForceDisplay,GForceDisplay.csproj,GForceDisplay.version,GameData/GForceDisplay/Plugins
+2:GForceDisplay,GForceDisplay/GForceDisplay.csproj,GForceDisplay.version,GameData/GForceDisplay/Plugins
 
 # 3:SOURCEFILE, DESTDIR
 3:GForceDisplay.version,GameData/GForceDisplay
