@@ -52,14 +52,46 @@ Copy the `GameData/GForceDisplay` folder into your KSP installation's `GameData`
 
 KSP exposes `Vessel.geeForce` as a scalar magnitude, so it does not contain a negative direction. Signed mode therefore calculates a directional value by differentiating the vessel's orbital velocity, subtracting `vessel.graviticAcceleration`, and projecting the resulting proper acceleration onto `vessel.ReferenceTransform.up`. This makes signed mode useful for detecting positive versus negative axial loading, while Total G remains the authoritative stock KSP scalar G-load.
 
-### G component sliders
+## 0.2.1 UI changes
 
-The flight display also includes two live sliding G indicators:
+- The main G-force display can be dragged from anywhere in the window except the resize grip; normal buttons remain clickable.
+- The settings window can also be dragged from anywhere while normal controls remain usable.
+- The main display window is resizable from the bottom-right corner.
+- The analog G-force dial automatically expands or contracts with the available window area.
+- Window width and height are saved and restored between sessions.
+- Minimum main-window size is 240 x 300 pixels.
 
-- **Vertical G** — a signed slider to the left of the main dial. Positive values are acceleration away from the current body center; negative values are downward.
-- **Horizontal G** — a magnitude slider below the main dial showing acceleration in the local horizontal plane.
+## 0.2.2 extrema markers
 
-Both indicators use the configured dial maximum as their scale and the configured warning/redline thresholds for marker color. They resize with the main window. Each indicator can be independently enabled or disabled in Settings; both are enabled by default, and the main dial expands to use the freed space when an indicator is hidden.
+- The dial now shows markers for the minimum and maximum G observed since the last reset.
+- MAX is shown with a green marker and value; MIN is shown with a blue marker and value.
+- In signed axial mode the markers can span the negative and positive sides of the dial.
+- In total-G mode the minimum is the actual lowest observed scalar G value, not a hard-coded zero.
+- The markers move and scale with the dial when the window is resized.
+- Reset Peak also clears both extrema markers and starts a new observation interval.
+
+## 0.2.3 vertical/horizontal scale and extrema
+
+- The vertical G slider now has tick marks and numeric scale labels from `-Dial Max` through `+Dial Max`.
+- The horizontal G slider now has tick marks and numeric scale labels from `0` through `Dial Max`.
+- Vertical G tracks and displays its own observed MIN and MAX values.
+- Horizontal G tracks and displays its own observed MIN and MAX values.
+- MIN markers are blue and MAX markers are green, matching the main dial convention.
+- Reset Peak clears the vertical and horizontal extrema as well as the main dial extrema.
+- All scale marks and extrema markers remain positioned correctly when the window is resized.
+
+## 0.2.4 external graph markings
+
+- Vertical scale tick marks are short and drawn only to the left of the vertical G track.
+- Vertical MIN/MAX extrema markers are short and drawn only to the left of the track.
+- Horizontal scale tick marks are short and drawn only below the horizontal G track.
+- Horizontal MIN/MAX extrema markers are short and drawn only below the track.
+- The live/current-G indicators continue to span the tracks for visibility.
+
+
+## 0.2.6 vertical zero label
+
+- The center/zero tick on the vertical G graph is now explicitly labeled `0`.
 
 
 ## 0.2.7

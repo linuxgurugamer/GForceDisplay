@@ -30,13 +30,9 @@ namespace GForceDisplay
         private const float ResizeGripSize = 18f;
 
         private Rect windowRect = new Rect(300f, 120f, 420f, 460f);
-        private Rect settingsRect = new Rect(590f, 120f, 300f, 320f);
+        private Rect settingsRect = new Rect(590f, 120f, 300f, 270f);
         private bool windowVisible = true;
         private bool settingsVisible;
-        private bool uiHidden;
-        private bool hideWhenPaused = true;
-        private bool showVerticalG = true;
-        private bool showHorizontalG = true;
         private bool resizingMainWindow;
         private Vector2 resizeStartMouse;
         private Vector2 resizeStartSize;
@@ -87,9 +83,6 @@ namespace GForceDisplay
             CreateTextures();
             LoadSettings();
             ResetSettingText();
-
-            GameEvents.onHideUI.Add(OnHideUI);
-            GameEvents.onShowUI.Add(OnShowUI);
         }
 
         private void Start()
@@ -99,32 +92,9 @@ namespace GForceDisplay
 
         private void OnDestroy()
         {
-            GameEvents.onHideUI.Remove(OnHideUI);
-            GameEvents.onShowUI.Remove(OnShowUI);
-
             SaveSettings();
             if (whiteTexture != null)
                 Destroy(whiteTexture);
-        }
-
-        private void OnHideUI()
-        {
-            // F2 / stock Hide UI must always suppress every G-Force Display window.
-            // Do not change windowVisible/settingsVisible here so they can return when the UI is shown.
-            uiHidden = true;
-        }
-
-        private void OnShowUI()
-        {
-            uiHidden = false;
-        }
-
-        private bool ShouldSuppressWindows()
-        {
-            if (uiHidden)
-                return true;
-
-            return hideWhenPaused && Time.timeScale <= 0.0001f;
         }
 
         private void FixedUpdate()
@@ -269,9 +239,6 @@ namespace GForceDisplay
             GUI.skin = HighLogic.Skin;
             EnsureStyles();
 
-            if (ShouldSuppressWindows())
-                return;
-
             if (windowVisible)
             {
                 NormalizeMainWindowRect();
@@ -316,27 +283,20 @@ namespace GForceDisplay
             float buttonY = height - margin - buttonHeight;
             float peakY = buttonY - gap - peakHeight;
             float rangeY = peakY - rangeHeight;
-            float horizontalGraphY = showHorizontalG ? rangeY - gap - horizontalGraphHeight : rangeY;
-            float contentBottom = showHorizontalG ? horizontalGraphY - gap : rangeY - gap;
+            float horizontalGraphY = rangeY - gap - horizontalGraphHeight;
+            float contentBottom = horizontalGraphY - gap;
             float contentHeight = Mathf.Max(120f, contentBottom - y);
 
-            float dialX = margin;
-            if (showVerticalG)
-            {
-                Rect verticalRect = new Rect(margin, y, verticalGraphWidth, contentHeight);
-                DrawVerticalGSlider(verticalRect, smoothedVerticalG);
-                dialX += verticalGraphWidth + gap;
-            }
+            Rect verticalRect = new Rect(margin, y, verticalGraphWidth, contentHeight);
+            DrawVerticalGSlider(verticalRect, smoothedVerticalG);
 
+            float dialX = margin + verticalGraphWidth + gap;
             float dialWidth = Mathf.Max(140f, width - dialX - margin);
             Rect dialRect = new Rect(dialX, y, dialWidth, contentHeight);
             DrawDial(dialRect, smoothedG);
 
-            if (showHorizontalG)
-            {
-                Rect horizontalRect = new Rect(dialX, horizontalGraphY, dialWidth, horizontalGraphHeight);
-                DrawHorizontalGSlider(horizontalRect, smoothedHorizontalG);
-            }
+            Rect horizontalRect = new Rect(dialX, horizontalGraphY, dialWidth, horizontalGraphHeight);
+            DrawHorizontalGSlider(horizontalRect, smoothedHorizontalG);
 
             GUI.Label(new Rect(margin, rangeY, width - margin * 2f, rangeHeight),
                 signedGMode
@@ -610,32 +570,6 @@ namespace GForceDisplay
             }
 
             GUILayout.Space(6f);
-
-            bool newShowVerticalG = GUILayout.Toggle(showVerticalG, "Show vertical G graph");
-            if (newShowVerticalG != showVerticalG)
-            {
-                showVerticalG = newShowVerticalG;
-                SaveSettings();
-            }
-
-            bool newShowHorizontalG = GUILayout.Toggle(showHorizontalG, "Show horizontal G graph");
-            if (newShowHorizontalG != showHorizontalG)
-            {
-                showHorizontalG = newShowHorizontalG;
-                SaveSettings();
-            }
-
-            GUILayout.Space(6f);
-
-            bool newHideWhenPaused = GUILayout.Toggle(hideWhenPaused, "Hide window when game is paused");
-            if (newHideWhenPaused != hideWhenPaused)
-            {
-                hideWhenPaused = newHideWhenPaused;
-                SaveSettings();
-            }
-            GUILayout.Label("F2 / Hide UI always hides the G-Force Display windows.", HighLogic.Skin.label);
-
-            GUILayout.Space(6f);
             DrawFloatSetting("Dial maximum G", ref dialMaxText);
             DrawFloatSetting("Warning starts at G", ref warningGText);
             DrawFloatSetting("Redline starts at G", ref redlineGText);
@@ -652,9 +586,6 @@ namespace GForceDisplay
                 warningG = 4f;
                 redlineG = 6f;
                 signedGMode = false;
-                showVerticalG = true;
-                showHorizontalG = true;
-                hideWhenPaused = true;
                 ResetSettingText();
                 ResetPeaks();
                 ResetAccelerationSampling();
@@ -975,9 +906,6 @@ namespace GForceDisplay
                 settingsRect.y = config.GetValue<float>("settingsY", settingsRect.y);
                 windowVisible = config.GetValue<bool>("windowVisible", true);
                 signedGMode = config.GetValue<bool>("signedGMode", false);
-                showVerticalG = config.GetValue<bool>("showVerticalG", true);
-                showHorizontalG = config.GetValue<bool>("showHorizontalG", true);
-                hideWhenPaused = config.GetValue<bool>("hideWhenPaused", true);
                 dialMax = config.GetValue<float>("dialMax", 10f);
                 warningG = config.GetValue<float>("warningG", 4f);
                 redlineG = config.GetValue<float>("redlineG", 6f);
@@ -1009,9 +937,6 @@ namespace GForceDisplay
                 config.SetValue("settingsY", settingsRect.y);
                 config.SetValue("windowVisible", windowVisible);
                 config.SetValue("signedGMode", signedGMode);
-                config.SetValue("showVerticalG", showVerticalG);
-                config.SetValue("showHorizontalG", showHorizontalG);
-                config.SetValue("hideWhenPaused", hideWhenPaused);
                 config.SetValue("dialMax", dialMax);
                 config.SetValue("warningG", warningG);
                 config.SetValue("redlineG", redlineG);

@@ -4,6 +4,7 @@
     <File Path="deploy.bat" />
     <File Path="GForceDisplay.version" />
     <File Path="jenkins.txt" />
+    <File Path="License.md" />
     <File Path="README.md" />
   </Folder>
   <Project Path="GForceDisplay/GForceDisplay.csproj" Id="a5f8a854-2279-4fea-90b2-042ca52e1826" />
