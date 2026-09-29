@@ -1,6 +1,12 @@
 {
   "NAME": "GForceDisplay",
   "URL": "https://raw.githubusercontent.com/linuxgurugamer/GForceDisplay/refs/heads/main/GForceDisplay.version",
+  "DOWNLOAD": "https://github.com/linuxgurugamer/GForceDisplay/releases",
+  "GITHUB": {
+    "USERNAME": "linuxgurugamer",
+    "REPOSITORY": "GForceDisplay"
+  },
+
   "VERSION": {
     "MAJOR": 0,
     "MINOR": 2,
