@@ -1,0 +1,9 @@
+Changelog
+
+0.2.19
+	reduced the blank space when no graphs are being shown
+	Added option to hide all text and only show the graph when only the Total G graph is being shown
+	Added "x" button to close the graph window and the settings window
+
+0.2.17
+	Initial Release

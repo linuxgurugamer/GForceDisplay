@@ -16,6 +16,8 @@ Displays the active vessel's current G-force in flight as a numerical value and 
 - Movable main and settings windows with saved positions.
 - ClickThroughBlocker support so clicks on the windows do not pass through into the flight scene.
 - ToolbarController support for stock Application Launcher and Blizzy Toolbar selection.
+- Main window can be resized down to a compact control-only size when all displays are disabled.
+- Optional graph-only mode when Total G is the only enabled display; right-click the graph to reopen Settings.
 
 ## Dependencies
 
