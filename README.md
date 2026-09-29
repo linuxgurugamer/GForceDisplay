@@ -1,11 +1,10 @@
 # GForceDisplay for KSP1
 
-Displays the active vessel's current G-force in flight as a numerical value and an analog dial.
+Displays the active vessel's current G-force in flight as a numerical value and an analog dial or graph. The main display can be configured to show either the total G-force magnitude (always non-negative) or a signed axial G-force (positive and negative values). Peak G values are tracked and can be reset with a button.
 
 ## Features
 
 - Main analog G-force dial can be enabled or disabled independently.
-
 - Large numerical G readout.
 - Analog dial with configurable maximum range.
 - Configurable warning and redline thresholds; dial ticks, needle, and value change color at the thresholds.
